@@ -34,8 +34,8 @@ class A3CTrainer:
             lr=lr
         )
 
-        self.global_model_lock = threading.Lock()
-
+        # Remove threading.Lock - not needed for multiprocessing
+        # self.global_model_lock = threading.Lock()
 
         self.global_episode_rewards = deque(maxlen=1000)
         self.global_episode_lengths = deque(maxlen=1000)
@@ -52,27 +52,32 @@ class A3CTrainer:
 
         return local_model
     
-
-    def worker_process(self, worker_id, global_model, global_optimizer, stats_queue, control_queue):
-
-        local_model = self.create_local_model()
+    @staticmethod
+    def worker_process_static(worker_id, model_class, obs_space, action_space, env_name, 
+                             gamma, n_steps, max_episodes_per_worker, global_model, 
+                             global_optimizer, optimizer_lock, stats_queue, control_queue):
+        """Static worker process to avoid pickling issues"""
+        
+        # Create local model
+        local_model = model_class(obs_space, action_space)
+        local_model.load_state_dict(global_model.state_dict())
 
         worker = A3CWorker(
-                worker_id = worker_id,
-                global_model = global_model,
-                local_model = local_model,
-                optimizer = global_optimizer,
-                env_name = self.env_name,
-                gamma = self.gamma,
-                n_steps = self.n_steps,
-                max_episodes = self.max_episodes_per_worker
+            worker_id=worker_id,
+            global_model=global_model,
+            local_model=local_model,
+            optimizer=global_optimizer,
+            optimizer_lock=optimizer_lock,  # Pass the multiprocessing lock
+            env_name=env_name,
+            gamma=gamma,
+            n_steps=n_steps,
+            max_episodes=max_episodes_per_worker
         )
 
         print(f"Worker {worker_id} gestartet")
 
-
         episodes_completed = 0
-        while episodes_completed < self.max_episodes_per_worker:
+        while episodes_completed < max_episodes_per_worker:
             try:
                 if not control_queue.empty():
                     command = control_queue.get_nowait()
@@ -94,15 +99,12 @@ class A3CTrainer:
                 break
         
         print(f"Worker {worker_id} beendet nach {episodes_completed} Episodes!")
-    
 
     def collect_statistics(self, stats_queue):
-
         total_episodes = 0
 
         while self.training_active:
             try:
-
                 stats = stats_queue.get(timeout=1.0)
 
                 with self.stats_lock:
@@ -114,11 +116,9 @@ class A3CTrainer:
                     self.print_progress(total_episodes)
             
             except:
-
                 continue
     
     def print_progress(self, total_episodes):
-
         if not self.global_episode_rewards:
             return
         
@@ -141,31 +141,24 @@ class A3CTrainer:
         print(f"Avg Episode Length: {avg_length:.1f}")
         print(f"========================\n")
     
-    
     def save_model(self, filepath):
-
         torch.save({
             'model_state_dict': self.global_model.state_dict(),
-            'optimizer_state_dict': self.global_optmizer.state_dict(),
-            'traning_stats': {
+            'optimizer_state_dict': self.global_optimizer.state_dict(),  # Fixed typo
+            'training_stats': {  # Fixed typo
                 'rewards': list(self.global_episode_rewards),
-                'lenghts': list(self.global_episode_lengths)
+                'lengths': list(self.global_episode_lengths)  # Fixed typo
             }
         }, filepath)
         print(f"Model gespeichert: {filepath}")
 
-
     def load_model(self, filepath):
-
         checkpoint = torch.load(filepath)
         self.global_model.load_state_dict(checkpoint['model_state_dict'])
         self.global_optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-
         print(f"Model geladen: {filepath}")
 
-
     def train(self, save_interval_minutes=10):
-
         print(f"Starte A3C Training mit {self.num_workers} Workers!")
         print(f"Environment: {self.env_name}")
         print(f"Model Parameter: {sum(p.numel() for p in self.global_model.parameters())}")
@@ -175,24 +168,38 @@ class A3CTrainer:
 
         mp.set_start_method('spawn', force=True)
 
-
+        # Create multiprocessing lock for optimizer synchronization
+        optimizer_lock = mp.Lock()
+        
         stats_queue = mp.Queue()
         control_queues = [mp.Queue() for _ in range(self.num_workers)]
         
-
         worker_processes = []
         for worker_id in range(self.num_workers):
             process = mp.Process(
-                target=self.worker_process,
-                args=(worker_id, self.global_model, self.global_optimizer, 
-                     stats_queue, control_queues[worker_id])
+                target=A3CTrainer.worker_process_static,  # Use static method
+                args=(
+                    worker_id,
+                    self.model_class,
+                    self.obs_space,
+                    self.action_space,
+                    self.env_name,
+                    self.gamma,
+                    self.n_steps,
+                    self.max_episodes_per_worker,
+                    self.global_model,
+                    self.global_optimizer,
+                    optimizer_lock,  # Pass multiprocessing lock
+                    stats_queue,
+                    control_queues[worker_id]
+                )
             )
             process.start()
             worker_processes.append(process)
         
         stats_thread = threading.Thread(
-            target = self.collect_statistics,
-            args = (stats_queue,)
+            target=self.collect_statistics,
+            args=(stats_queue,)
         )
         stats_thread.daemon = True
         stats_thread.start()
@@ -211,7 +218,7 @@ class A3CTrainer:
         except KeyboardInterrupt:
             print("\n Training wird gestoppt...")
 
-            for control_queue in control_queue:
+            for control_queue in control_queues:  # Fixed variable name
                 control_queue.put("STOP")
 
         finally:
@@ -231,20 +238,19 @@ class A3CTrainer:
                 print(f" Finale durchschnittliche Belohnung: {np.mean(self.global_episode_rewards):.2f}")
             print(f"Model gespeichert als: a3c_final_model.pth")
     
-
+    @staticmethod
     def create_training_manager(model_class, env_name="MiniGrid-Empty-5x5-v0", num_workers=4, lr=0.001):
-
         temp_env = gym.make(env_name)
         obs_space = temp_env.observation_space
         action_space = temp_env.action_space
         temp_env.close()
 
         return A3CTrainer(
-            model_class = model_class,
-            obs_space = obs_space,
-            action_space = action_space,
-            env_name = env_name,
-            num_workers = num_workers,
-            lr = lr
-        )	
+            model_class=model_class,
+            obs_space=obs_space,
+            action_space=action_space,
+            env_name=env_name,
+            num_workers=num_workers,
+            lr=lr
+        )
 
