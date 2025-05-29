@@ -19,7 +19,7 @@ class A3CWorker:
         self.max_episodes = max_episodes
 
         self.env = gym.make(env_name, render_mode=None)
-        self.current_obs = None  # Store current observation
+        self.current_obs = None  
 
     
     def sync_with_global(self):
@@ -50,10 +50,10 @@ class A3CWorker:
         log_probs = []
 
         for step in range(self.n_steps):
-            # Use the stored current observation instead of calling get_obs()
+            
             state = self.current_obs
 
-            # Enable gradient computation for local model
+            
             state_tensor = {
                 'image': torch.FloatTensor(state['image']).unsqueeze(0)
             }
@@ -67,15 +67,15 @@ class A3CWorker:
             values.append(value.item())
             log_probs.append(log_prob)
 
-            # Step the environment and update current observation
+            
             obs, reward, terminated, truncated, info = self.env.step(action.item())
-            self.current_obs = obs  # Update current observation
+            self.current_obs = obs  
             done = terminated or truncated
 
             rewards.append(reward)
 
             if done:
-                self.current_obs, _ = self.env.reset()  # Reset and store new observation
+                self.current_obs, _ = self.env.reset()  
                 break
 
         return states, actions, rewards, values, log_probs, done
@@ -98,20 +98,20 @@ class A3CWorker:
         advantages = torch.FloatTensor(advantages)
         log_probs = torch.stack(log_probs)
 
-        # Recompute values with gradients for the collected states
+        
         values_tensor = []
         for state in states:
             state_tensor = {
                 'image': torch.FloatTensor(state['image']).unsqueeze(0)
             }
             _, value = self.local_model(state_tensor)
-            values_tensor.append(value.squeeze())  # Remove extra dimensions
+            values_tensor.append(value.squeeze())  
         
         values_tensor = torch.stack(values_tensor)
 
         actor_loss = -(log_probs * advantages.detach()).mean()
         
-        # Ensure both tensors have the same shape
+        
         critic_loss = F.mse_loss(values_tensor, returns)
 
         total_loss = actor_loss + 0.5 * critic_loss
@@ -119,15 +119,15 @@ class A3CWorker:
         return total_loss, actor_loss, critic_loss
     
     def update_global_model(self, loss):
-        # Clear local model gradients first
+        
         self.local_model.zero_grad()
         
-        # Compute gradients on local model
+        
         loss.backward()
 
-        # Use the multiprocessing lock to synchronize optimizer updates
+        
         with self.optimizer_lock:
-            # Copy gradients from local to global model
+            
             for local_param, global_param in zip(self.local_model.parameters(),
                                                 self.global_model.parameters()):
                 if global_param.grad is None:
@@ -136,10 +136,10 @@ class A3CWorker:
                     global_param.grad = local_param.grad.clone()
 
             self.optimizer.step()
-            self.optimizer.zero_grad()  # Clear global optimizer gradients
+            self.optimizer.zero_grad()  
     
     def run_episode(self):
-        # Reset environment and store initial observation
+        
         self.current_obs, _ = self.env.reset()
         episode_reward = 0
         episode_length = 0

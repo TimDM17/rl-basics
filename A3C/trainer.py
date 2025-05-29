@@ -34,8 +34,7 @@ class A3CTrainer:
             lr=lr
         )
 
-        # Remove threading.Lock - not needed for multiprocessing
-        # self.global_model_lock = threading.Lock()
+        
 
         self.global_episode_rewards = deque(maxlen=1000)
         self.global_episode_lengths = deque(maxlen=1000)
@@ -67,7 +66,7 @@ class A3CTrainer:
             global_model=global_model,
             local_model=local_model,
             optimizer=global_optimizer,
-            optimizer_lock=optimizer_lock,  # Pass the multiprocessing lock
+            optimizer_lock=optimizer_lock,  
             env_name=env_name,
             gamma=gamma,
             n_steps=n_steps,
@@ -168,7 +167,7 @@ class A3CTrainer:
 
         mp.set_start_method('spawn', force=True)
 
-        # Create multiprocessing lock for optimizer synchronization
+        
         optimizer_lock = mp.Lock()
         
         stats_queue = mp.Queue()
@@ -177,7 +176,7 @@ class A3CTrainer:
         worker_processes = []
         for worker_id in range(self.num_workers):
             process = mp.Process(
-                target=A3CTrainer.worker_process_static,  # Use static method
+                target=A3CTrainer.worker_process_static,  
                 args=(
                     worker_id,
                     self.model_class,
@@ -189,7 +188,7 @@ class A3CTrainer:
                     self.max_episodes_per_worker,
                     self.global_model,
                     self.global_optimizer,
-                    optimizer_lock,  # Pass multiprocessing lock
+                    optimizer_lock,  
                     stats_queue,
                     control_queues[worker_id]
                 )
@@ -209,7 +208,7 @@ class A3CTrainer:
             while any(p.is_alive() for p in worker_processes):
                 time.sleep(1)
                 
-                # Periodisches Speichern
+                
                 if time.time() - last_save_time > save_interval_minutes * 60:
                     timestamp = time.strftime("%Y%m%d_%H%M%S")
                     self.save_model(f"a3c_checkpoint_{timestamp}.pth")
@@ -218,7 +217,7 @@ class A3CTrainer:
         except KeyboardInterrupt:
             print("\n Training wird gestoppt...")
 
-            for control_queue in control_queues:  # Fixed variable name
+            for control_queue in control_queues:  
                 control_queue.put("STOP")
 
         finally:

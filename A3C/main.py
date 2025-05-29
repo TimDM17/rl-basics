@@ -192,41 +192,5 @@ def main():
         print("\n Training Script beendet!")
 
 
-def quick_test():
-    """
-    Schneller Test ob alles funktioniert
-    
-    Du kannst das aufrufen mit: python main_a3c.py --test
-    """
-    print("Schneller System Test...")
-    
-    # Environment Test
-    env_name = "MiniGrid-Empty-5x5-v0"
-    obs_space, action_space = validate_environment(env_name)
-    
-    # Model Test
-    print("Teste Model...")
-    model = MiniGridACModel(obs_space, action_space)
-    
-    # Dummy Input Test
-    dummy_obs = {
-        'image': torch.randn(1, *obs_space['image'].shape)
-    }
-    
-    with torch.no_grad():
-        dist, value = model(dummy_obs)
-        action = dist.sample()
-        log_prob = dist.log_prob(action)
-    
-    print(f"Model Test erfolgreich!")
-    print(f"Action: {action.item()}")
-    print(f"Value: {value.item():.3f}")
-    print(f"Log Prob: {log_prob.item():.3f}")
-    print("Alles bereit für Training!")
-
-
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and '--test' in sys.argv:
-        quick_test()
-    else:
         main()
