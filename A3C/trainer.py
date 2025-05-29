@@ -237,20 +237,3 @@ class A3CTrainer:
             if self.global_episode_rewards:
                 print(f" Finale durchschnittliche Belohnung: {np.mean(self.global_episode_rewards):.2f}")
             print(f"Model gespeichert als: a3c_final_model.pth")
-    
-    @staticmethod
-    def create_training_manager(model_class, env_name="MiniGrid-Empty-5x5-v0", num_workers=4, lr=0.001):
-        temp_env = gym.make(env_name)
-        obs_space = temp_env.observation_space
-        action_space = temp_env.action_space
-        temp_env.close()
-
-        return A3CTrainer(
-            model_class=model_class,
-            obs_space=obs_space,
-            action_space=action_space,
-            env_name=env_name,
-            num_workers=num_workers,
-            lr=lr
-        )
-

@@ -163,10 +163,7 @@ def main():
             print(f" Model nicht gefunden: {args.load_model}")
             sys.exit(1)
     
-    total_params = sum(p.numel() for p in training_manager.global_model.parameters())
-    trainable_params = sum(p.numel() for p in training_manager.global_model.parameters() if p.requires_grad)
-    print(f"Model Parameter: {total_params:,} (trainable: {trainable_params:,})")
-
+    
     print("\nBereit zum Training!")
     print("Tipps:")
     print("- Drücke Ctrl+C um das Training zu stoppen")

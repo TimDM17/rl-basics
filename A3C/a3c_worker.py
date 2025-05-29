@@ -21,8 +21,6 @@ class A3CWorker:
         self.env = gym.make(env_name, render_mode=None)
         self.current_obs = None  # Store current observation
 
-        self.episode_rewards = deque(maxlen=100)
-        self.episode_lengths = deque(maxlen=100)
     
     def sync_with_global(self):
         self.local_model.load_state_dict(self.global_model.state_dict())
@@ -158,27 +156,8 @@ class A3CWorker:
             self.update_global_model(loss)
 
             if done:
-                self.episode_rewards.append(episode_reward)
-                self.episode_lengths.append(episode_length)
                 break
             
         return episode_reward, episode_length
     
-    def run(self):
-        print(f"Worker {self.worker_id} started...")
-
-        for episode in range(self.max_episodes):
-            episode_reward, episode_length = self.run_episode()
-
-            if episode % 10 == 0:
-                avg_reward = np.mean(self.episode_rewards) if self.episode_rewards else 0
-                avg_length = np.mean(self.episode_lengths) if self.episode_lengths else 0
-
-                print(f"Worker {self.worker_id} - Episode {episode}: "
-                      f"Reward: {episode_reward:.2f}, "
-                      f"Length: {episode_length}, "
-                      f"Average Reward (100): {avg_reward:.2f}, "
-                      f"Average Length (100): {avg_length:.2f}")
-        
-        print(f"Worker {self.worker_id} beendet!")
-        self.env.close()
+    
