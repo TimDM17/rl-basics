@@ -100,37 +100,44 @@ class Worker(mp.Process):
 
     def run(self):
         total_step = 1
-        while self.g_ep.value < MAX_EP:
-            s, _ = self.env.reset()  
-            buffer_s, buffer_a, buffer_r = [], [], []
-            ep_r = 0.
-            while True:
-                if self.name == 'w00':
-                    self.env.render()
-                
-                # Create a proper batch for dictionary observation
-                s_batch = {"image": v_wrap(s["image"][None, :])}
-                
-                a = self.lnet.choose_action(s_batch)
-                s_, r, terminated, truncated, info = self.env.step(a)
-                done = terminated or truncated
-                if done: r = -1
-                ep_r += r
-                buffer_a.append(a)
-                buffer_s.append(s)
-                buffer_r.append(r)
+        try:
+            while self.g_ep.value < MAX_EP:
+                s, _ = self.env.reset()  
+                buffer_s, buffer_a, buffer_r = [], [], []
+                ep_r = 0.
+                while True:
+                    if self.name == 'w00':
+                        self.env.render()
+                    
+                    
+                    s_image_normalized = s["image"][None, :] / 255.0
+                    s_batch = {"image": v_wrap(s_image_normalized)}
+                    
+                    a = self.lnet.choose_action(s_batch)
+                    s_, r, terminated, truncated, info = self.env.step(a)
+                    done = terminated or truncated
+                    
+                    ep_r += r
+                    buffer_a.append(a)
+                    buffer_s.append(s) 
+                    buffer_r.append(r)
 
-                if total_step % UPDATE_GLOBAL_ITER == 0 or done:  
-                    push_and_pull(self.opt, self.lnet, self.gnet, done, s_, buffer_s, buffer_a, buffer_r, GAMMA)
-                    buffer_s, buffer_a, buffer_r = [], [], []
+                    if total_step % UPDATE_GLOBAL_ITER == 0 or done:  
+                        # s_ (next state) also needs normalization before being passed to push_and_pull
+                        s_image_normalized_for_pull = s_["image"] / 255.0 if not done else None
+                        push_and_pull(self.opt, self.lnet, self.gnet, done, s_image_normalized_for_pull, s_, buffer_s, buffer_a, buffer_r, GAMMA)
+                        buffer_s, buffer_a, buffer_r = [], [], []
 
-                    if done:
-                        record(self.g_ep, self.g_ep_r, ep_r, self.res_queue, self.name)
-                        break
-                s = s_
-                total_step += 1
-        self.res_queue.put(None)
-
+                        if done:
+                            record(self.g_ep, self.g_ep_r, ep_r, self.res_queue, self.name)
+                            break
+                    s = s_
+                    total_step += 1
+        except Exception as e:
+            print(f"Worker {self.name} encountered an error: {e}")
+            
+        finally:
+            self.res_queue.put(None) 
 
 
 if __name__ == "__main__":
@@ -140,15 +147,19 @@ if __name__ == "__main__":
     global_ep, global_ep_r, res_queue = mp.Value('i', 0), mp.Value('d', 0.), mp.Queue()
 
     # parallel training
-    workers = [Worker(gnet, opt, global_ep, global_ep_r, res_queue, i) for i in range(mp.cpu_count())]
+    num_workers = mp.cpu_count()
+    workers = [Worker(gnet, opt, global_ep, global_ep_r, res_queue, i) for i in range(num_workers)]
     [w.start() for w in workers]
+    
     res = []                    
-    while True:
+    active_workers = num_workers
+    while active_workers > 0:
         r = res_queue.get()
         if r is not None:
             res.append(r)
         else:
-            break
+            active_workers -= 1
+    
     [w.join() for w in workers]
 
 

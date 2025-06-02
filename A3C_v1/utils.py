@@ -15,12 +15,11 @@ def set_init(layers):
         nn.init.constant_(layer.bias, 0.)
 
 
-def push_and_pull(opt, lnet, gnet, done, s_, bs, ba, br, gamma):
+def push_and_pull(opt, lnet, gnet, done, s_image_normalized_for_pull, s_raw_, bs, ba, br, gamma):
     if done:
         v_s_ = 0.
     else:
-        
-        s_batch = {"image": v_wrap(s_["image"][None, :])}
+        s_batch = {"image": v_wrap(s_image_normalized_for_pull[None, :])} 
         _, v_s_ = lnet.forward(s_batch)
         v_s_ = v_s_.data.numpy()[0]
 
@@ -30,8 +29,8 @@ def push_and_pull(opt, lnet, gnet, done, s_, bs, ba, br, gamma):
         buffer_v_target.append(v_s_)
     buffer_v_target.reverse()
 
-    
-    batch_obs = {"image": v_wrap(np.stack([s["image"] for s in bs]))}
+    normalized_bs_images = np.stack([s["image"] / 255.0 for s in bs])
+    batch_obs = {"image": v_wrap(normalized_bs_images)}
     
     loss = lnet.loss_func(
         batch_obs,
