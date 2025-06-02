@@ -17,7 +17,7 @@ GAMMA = 0.9
 MAX_EP = 3000
 
 
-env = gym.make('MiniGrid-DoorKey-5x5-v0')
+env = gym.make('MiniGrid-MultiRoom-N2-S4-v0')
 N_S = env.observation_space
 N_A = env.action_space
 
