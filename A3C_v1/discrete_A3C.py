@@ -1,15 +1,19 @@
 import torch
-import torch.nn as nn
-from utils import v_wrap, set_init, push_and_pull, record
-import torch.nn.functional as F
-from torch.distributions import Categorical
+from utils import v_wrap, push_and_pull, record
 import torch.multiprocessing as mp
 from shared_adam import SharedAdam
 import gymnasium as gym
 import minigrid
 import os
+from model import Net
 os.environ["OMP_NUM_THREADS"] = "1"
 
+
+
+RESULTS_DIR = "./results"
+if not os.path.exists(RESULTS_DIR):
+    os.makedirs(RESULTS_DIR)
+MODEL_PATH = os.path.join(RESULTS_DIR, "a3c_minigrid_model.pth")
 
 
 UPDATE_GLOBAL_ITER = 5
@@ -17,76 +21,9 @@ GAMMA = 0.9
 MAX_EP = 3000
 
 
-env = gym.make('MiniGrid-MultiRoom-N2-S4-v0')
+env = gym.make('MiniGrid-Empty-5x5-v0')
 N_S = env.observation_space
 N_A = env.action_space
-
-
-class Net(nn.Module):
-    def __init__(self, obs_space, action_space):
-        super().__init__()
-
-        # Define image embedding layers
-        self.image_conv = nn.Sequential(
-            nn.Conv2d(3, 16, (2, 2)),
-            nn.ReLU(),
-            nn.MaxPool2d((2, 2)),
-            nn.Conv2d(16, 32, (2, 2)),
-            nn.ReLU(),
-            nn.Conv2d(32, 64, (2, 2)),
-            nn.ReLU()
-        )
-
-        # Calculate embedding size 
-        n = obs_space["image"].shape[0]
-        m = obs_space["image"].shape[1]
-        self.image_embedding_size = ((n-1)//2-2)*((m-1)//2-2)*64
-
-
-        # Actor
-        self.actor = nn.Sequential(
-            nn.Linear(self.image_embedding_size, 64),
-            nn.Tanh(),
-            nn.Linear(64, action_space.n)
-        )
-
-        # Critic
-        self.critic = nn.Sequential(
-            nn.Linear(self.image_embedding_size, 64),
-            nn.Tanh(),
-            nn.Linear(64, 1)
-        )
-
-    def forward(self, obs):
-        x = obs["image"].transpose(1, 3).transpose(2, 3)
-        x = self.image_conv(x)
-        x = x.reshape(x.shape[0], -1)  
-
-        embedding = x
-
-        x = self.actor(embedding)
-        dist = Categorical(logits=F.log_softmax(x, dim=1))
-
-        x = self.critic(embedding)
-        value = x.squeeze(1)
-
-        return dist, value
-    
-    def choose_action(self, s):
-        self.eval()
-        dist, _ = self.forward(s)
-        return dist.sample().numpy()[0]
-    
-    def loss_func(self, s, a, v_t):
-        self.train()
-        dist, values = self.forward(s)
-        td = v_t - values
-        c_loss = td.pow(2)
-        
-        exp_v = dist.log_prob(a) * td.detach().squeeze()
-        a_loss = -exp_v
-        total_loss = (c_loss + a_loss).mean()
-        return total_loss
 
 
 class Worker(mp.Process):
@@ -161,6 +98,11 @@ if __name__ == "__main__":
             active_workers -= 1
     
     [w.join() for w in workers]
+
+
+    print("Training complete. Saving global network...")
+    torch.save(gnet.state_dict(), MODEL_PATH)
+    print(f"Model saved to {MODEL_PATH}")
 
 
     import matplotlib.pyplot as plt
