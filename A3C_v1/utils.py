@@ -15,7 +15,7 @@ def set_init(layers):
         nn.init.constant_(layer.bias, 0.)
 
 
-def push_and_pull(opt, lnet, gnet, done, s_image_normalized_for_pull, s_raw_, bs, ba, br, gamma):
+def push_and_pull(opt, lnet, gnet, done, s_image_normalized_for_pull, bs, ba, br, gamma):
     if done:
         v_s_ = 0.
     else:
