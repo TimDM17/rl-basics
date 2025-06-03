@@ -4,6 +4,7 @@ import gymnasium as gym
 import minigrid
 import torch
 import torch.nn as nn
+import argparse
 
 from DQN_model import DQNCNN
 from replay_buffer import ReplayBuffer
@@ -135,25 +136,56 @@ def run(config):
 
 
 if __name__ == "__main__":
-
-    config = {
-        "learning_rate" : 0.001,
-        "discount_factor" : 0.99,
-        "target_update_freq" : 10,  
-        "batch_size" : 64,
-        "buffer_capacity" : 1000,
-        "num_episodes" : 1000,
-        "max_steps_per_episode" : 100,
-        "epsilon" : 1.0,
-        "epsilon_min" : 0.01,
-        "epsilon_decay" : 0.995,
-        "environment_name" : "MiniGrid-Empty-5x5-v0",
-    	"save_dir" : "./results"
+    default_config = {
+        "learning_rate": 0.001,
+        "discount_factor": 0.99,
+        "target_update_freq": 10,  
+        "batch_size": 64,
+        "buffer_capacity": 1000,
+        "num_episodes": 1000,
+        "max_steps_per_episode": 100,
+        "epsilon": 1.0,
+        "epsilon_min": 0.01,
+        "epsilon_decay": 0.995,
+        "environment_name": "MiniGrid-Empty-5x5-v0",
+        "save_dir": "./results"
     }
+    
+    
+    parser = argparse.ArgumentParser(description='DQN Training für MiniGrid-Umgebungen')
+    
+    parser.add_argument('--learning_rate', type=float, default=default_config['learning_rate'], 
+                        help=f'Lernrate für den Optimizer (default: {default_config["learning_rate"]})')
+    parser.add_argument('--discount_factor', type=float, default=default_config['discount_factor'],
+                        help=f'Discount-Faktor für zukünftige Belohnungen (default: {default_config["discount_factor"]})')
+    parser.add_argument('--target_update_freq', type=int, default=default_config['target_update_freq'],
+                        help=f'Aktualisierungshäufigkeit für das Zielnetzwerk (default: {default_config["target_update_freq"]})')
+    parser.add_argument('--batch_size', type=int, default=default_config['batch_size'],
+                        help=f'Batch-Größe für das Training (default: {default_config["batch_size"]})')
+    parser.add_argument('--buffer_capacity', type=int, default=default_config['buffer_capacity'],
+                        help=f'Kapazität des Replay-Buffers (default: {default_config["buffer_capacity"]})')
+    parser.add_argument('--num_episodes', type=int, default=default_config['num_episodes'],
+                        help=f'Anzahl der Trainingsepisoden (default: {default_config["num_episodes"]})')
+    parser.add_argument('--max_steps_per_episode', type=int, default=default_config['max_steps_per_episode'],
+                        help=f'Maximale Schritte pro Episode (default: {default_config["max_steps_per_episode"]})')
+    parser.add_argument('--epsilon', type=float, default=default_config['epsilon'],
+                        help=f'Startwert für Epsilon (Exploration) (default: {default_config["epsilon"]})')
+    parser.add_argument('--epsilon_min', type=float, default=default_config['epsilon_min'],
+                        help=f'Minimaler Epsilon-Wert (default: {default_config["epsilon_min"]})')
+    parser.add_argument('--epsilon_decay', type=float, default=default_config['epsilon_decay'],
+                        help=f'Abnahmerate für Epsilon (default: {default_config["epsilon_decay"]})')
+    parser.add_argument('--environment_name', type=str, default=default_config['environment_name'],
+                        help=f'Name der Gymnasium-Umgebung (default: {default_config["environment_name"]})')
+    parser.add_argument('--save_dir', type=str, default=default_config['save_dir'],
+                        help=f'Verzeichnis zum Speichern der Ergebnisse (default: {default_config["save_dir"]})')
+    
+    args = parser.parse_args()
+    config = vars(args)  
+    
 
     rewards, trained_model = run(config)
 
-    
+
 
 
 
