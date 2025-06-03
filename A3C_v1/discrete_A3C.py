@@ -4,6 +4,7 @@ import gymnasium as gym
 import minigrid
 import os
 import matplotlib.pyplot as plt
+import argparse
 from utils import v_wrap, push_and_pull, record
 from shared_adam import SharedAdam
 from model import Net
@@ -99,7 +100,6 @@ class Worker(mp.Process):
 
 
 class TrainingConfig:
-    
     
     def __init__(
         self, 
@@ -228,22 +228,65 @@ def plot_results(results, save_path=None):
 
 def main():
     
-    config = TrainingConfig(
-        env_name='MiniGrid-Empty-5x5-v0',
-        update_iter=5,
-        gamma=0.9,
-        max_ep=3000,
-        lr=1e-4,
-        betas=(0.92, 0.999),
-        render=True,
-        save_interval=500
-    )
+    default_config = {
+        "env_name": 'MiniGrid-Empty-5x5-v0',
+        "update_iter": 5,
+        "gamma": 0.9,
+        "max_ep": 3000,
+        "lr": 1e-4,
+        "beta1": 0.92,
+        "beta2": 0.999,
+        "num_workers": None,
+        "render": True,
+        "save_interval": 500
+    }
+    
+    # Create argument parser
+    parser = argparse.ArgumentParser(description='A3C Training für MiniGrid-Umgebungen')
+    
+    # Add arguments for all hyperparameters
+    parser.add_argument('--env_name', type=str, default=default_config['env_name'],
+                        help=f'Name der Gymnasium-Umgebung (default: {default_config["env_name"]})')
+    parser.add_argument('--update_iter', type=int, default=default_config['update_iter'],
+                        help=f'Iterationen zwischen Netzwerk-Updates (default: {default_config["update_iter"]})')
+    parser.add_argument('--gamma', type=float, default=default_config['gamma'],
+                        help=f'Discount-Faktor für zukünftige Belohnungen (default: {default_config["gamma"]})')
+    parser.add_argument('--max_ep', type=int, default=default_config['max_ep'],
+                        help=f'Maximale Anzahl von Episoden (default: {default_config["max_ep"]})')
+    parser.add_argument('--lr', type=float, default=default_config['lr'],
+                        help=f'Lernrate für den Optimizer (default: {default_config["lr"]})')
+    parser.add_argument('--beta1', type=float, default=default_config['beta1'],
+                        help=f'Beta1 Parameter für den Adam-Optimizer (default: {default_config["beta1"]})')
+    parser.add_argument('--beta2', type=float, default=default_config['beta2'],
+                        help=f'Beta2 Parameter für den Adam-Optimizer (default: {default_config["beta2"]})')
+    parser.add_argument('--num_workers', type=int, default=default_config['num_workers'],
+                        help=f'Anzahl der Worker-Prozesse (default: Anzahl der CPU-Kerne)')
+    parser.add_argument('--render', action='store_true', default=default_config['render'],
+                        help=f'Umgebung rendern (default: {default_config["render"]})')
+    parser.add_argument('--no_render', action='store_false', dest='render',
+                        help=f'Umgebung nicht rendern')
+    parser.add_argument('--save_interval', type=int, default=default_config['save_interval'],
+                        help=f'Intervall zum Speichern von Checkpoints (default: {default_config["save_interval"]})')
     
    
+    args = parser.parse_args()
+    
+    
+    config = TrainingConfig(
+        env_name=args.env_name,
+        update_iter=args.update_iter,
+        gamma=args.gamma,
+        max_ep=args.max_ep,
+        lr=args.lr,
+        betas=(args.beta1, args.beta2),
+        num_workers=args.num_workers,
+        render=args.render,
+        save_interval=args.save_interval
+    )
+    
     trainer = A3CTrainer(config)
     results = trainer.train()  
     
-    # Ergebnisse visualisieren
     plot_results(results, config.plot_path)
 
 
