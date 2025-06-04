@@ -1,0 +1,30 @@
+# Python virtual environment
+rl_venv/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Results directories
+A3C_v1/results/
+DQN_v1/results/
+
+# Other common Python exclusions
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
